@@ -55,11 +55,21 @@ erDiagram
         int job_level
         string change_reason
     }
-
-    ## Nullable Columns
+## Nullable Columns
 
 1. The department description can be NULL because a description may not always be available.
 
 2. The employee manager_id can be NULL when an employee does not have a manager assigned or the manager information is unavailable.
 
 3. The employee exit_date and assignment effective_to can be NULL because an employee may still be working and an assignment may still be active.
+
+## Historical Department Lookup
+
+To find employees who belonged to department D05 on 30 June 2025,
+use the employee_assignments table.
+
+Filter records where department_id = 'D05',
+effective_from <= '2025-06-30', and
+effective_to is NULL or effective_to >= '2025-06-30'.
+
+This identifies assignments active on that date.
