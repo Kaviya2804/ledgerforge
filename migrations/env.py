@@ -8,13 +8,15 @@ from app.config import settings
 from app.database import Base
 from app import models  # noqa: F401
 
+# Register all SQLAlchemy models
+target_metadata = Base.metadata
+
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Register all SQLAlchemy models
-target_metadata = Base.metadata
+
 
 # Read the database URL from project settings
 database_url = settings.database_url

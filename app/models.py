@@ -1,4 +1,4 @@
-from datetime import date, datetime
+﻿from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -108,4 +108,46 @@ class EmployeeAssignment(Base):
             "effective_from",
             "effective_to",
         ),
+    )
+class SalaryComponent(Base):
+    __tablename__ = "salary_components"
+
+    component_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    component_name: Mapped[str] = mapped_column(String(100))
+    component_type: Mapped[str] = mapped_column(String(30))
+    taxable: Mapped[str] = mapped_column(String(1))
+    calculation_rule: Mapped[str] = mapped_column(String(300))
+    is_fixed: Mapped[str] = mapped_column(String(1))
+
+
+class SalaryRevision(Base):
+    __tablename__ = "salary_revisions"
+
+    revision_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey("employees.emp_id"), index=True)
+    effective_from: Mapped[date] = mapped_column(Date, index=True)
+    revision_reason: Mapped[str] = mapped_column(String(200))
+    previous_annual_fixed: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    new_annual_fixed: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    pct_change: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
+    role_id_after: Mapped[str] = mapped_column(ForeignKey("roles.role_id"))
+    approved_by: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class SalaryStructure(Base):
+    __tablename__ = "salary_structures"
+
+    structure_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey("employees.emp_id"), index=True)
+    component_id: Mapped[str] = mapped_column(ForeignKey("salary_components.component_id"))
+    component_name: Mapped[str] = mapped_column(String(100))
+    component_type: Mapped[str] = mapped_column(String(30))
+    monthly_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    effective_from: Mapped[date] = mapped_column(Date, index=True)
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    revision_id: Mapped[str] = mapped_column(ForeignKey("salary_revisions.revision_id"))
+
+    __table_args__ = (
+        Index("ix_salary_employee_dates", "employee_id", "effective_from", "effective_to"),
     )
