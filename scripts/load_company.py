@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 
+from app.config import settings
 from app.database import SessionLocal
 from app.models import (
     Department,
@@ -11,22 +12,23 @@ from app.models import (
     SalaryRevision,
     SalaryStructure,
 )
-from app.config import settings
 
 
 def get_csv_path(filename: str) -> Path:
+    """Return the path of a CSV file."""
     return Path(settings.data_dir) / filename
 
 
 def read_csv(filename: str) -> pd.DataFrame:
+    """Read a CSV file and prepare values for database insertion."""
     file_path = get_csv_path(filename)
 
     if not file_path.exists():
-        raise FileNotFoundError(f"CSV file not found: {file_path}")
+        raise FileNotFoundError(f"CSV file not found: {file_path.resolve()}")
 
     df = pd.read_csv(file_path)
 
-    # Rename employee CSV columns to match the model.
+    # Rename employee CSV columns to match the database model.
     if filename == "employees.csv":
         df = df.rename(
             columns={
@@ -39,6 +41,7 @@ def read_csv(filename: str) -> pd.DataFrame:
                 "career_gap_months": "career_gap_month",
             }
         )
+
     # Convert Y/N values to Boolean.
     boolean_columns = {
         "roles.csv": ["overtime_eligible"],
@@ -46,10 +49,10 @@ def read_csv(filename: str) -> pd.DataFrame:
     }
 
     for column in boolean_columns.get(filename, []):
-        df[column] = (
-            df[column]
-            .map({"Y": True, "N": False})
-        )
+        if column in df.columns:
+            df[column] = df[column].map(
+                {"Y": True, "N": False}
+            )
 
     # Convert date columns.
     date_columns = {
@@ -76,18 +79,21 @@ def read_csv(filename: str) -> pd.DataFrame:
 
     for column in date_columns.get(filename, []):
         if column in df.columns:
-            df[column] = pd.to_datetime(df[column], errors="raise")
+            df[column] = pd.to_datetime(
+                df[column], errors="raise"
+            )
 
             if column != "created_at":
                 df[column] = df[column].dt.date
 
-    # Convert missing values to None.
+    # Replace missing values with None.
     df = df.astype(object).where(pd.notna(df), None)
 
     return df
 
 
 def load_csv_to_table(session, filename, model, table_name):
+    """Load CSV records using merge so existing primary keys are updated."""
     df = read_csv(filename)
     records = df.to_dict(orient="records")
 
@@ -101,11 +107,16 @@ def load_csv_to_table(session, filename, model, table_name):
     print(f"{table_name}: Loaded {len(records)} rows", flush=True)
 
 
+# Load parent tables before dependent tables.
 TABLES = [
     ("departments.csv", Department, "departments"),
     ("roles.csv", Role, "roles"),
     ("employees.csv", Employee, "employees"),
-    ("employee_assignments.csv", EmployeeAssignment, "employee_assignments"),
+    (
+        "employee_assignments.csv",
+        EmployeeAssignment,
+        "employee_assignments",
+    ),
     ("salary_components.csv", SalaryComponent, "salary_components"),
     ("salary_revisions.csv", SalaryRevision, "salary_revisions"),
     ("salary_structures.csv", SalaryStructure, "salary_structures"),
@@ -113,6 +124,7 @@ TABLES = [
 
 
 def load_company_data():
+    """Load all configured company data in a single transaction."""
     with SessionLocal() as session:
         try:
             for filename, model, table_name in TABLES:
@@ -124,13 +136,18 @@ def load_company_data():
                 )
 
             session.commit()
+
             print(
-                "\nAll company and salary data loaded successfully!",
+                "\nAll company data loaded successfully!",
                 flush=True,
             )
 
         except Exception:
             session.rollback()
+            print(
+                "\nLoading failed. Database changes were rolled back.",
+                flush=True,
+            )
             raise
 
 
