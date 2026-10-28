@@ -80,3 +80,44 @@ def test_monthly_summary_excludes_weekends_and_holidays():
     finally:
         Base.metadata.drop_all(engine)
         engine.dispose()
+def test_monthly_summary_detects_missing_checkout():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    TestSession = sessionmaker(bind=engine)
+    Base.metadata.create_all(engine)
+
+    try:
+        with TestSession() as session:
+            session.add(
+                Attendance(
+                    attendance_id="TEST-ATT-004",
+                    employee_id="TEST-EMP-002",
+                    attendance_date=date(2025, 4, 2),
+                    weekday="Wed",
+                    status="PRESENT",
+                    check_in="09:00:00",
+                    check_out=None,
+                    late_flag="N",
+                    overtime_hours=Decimal("2.00"),
+                )
+            )
+
+            session.commit()
+
+            result = monthly_summary(
+                session,
+                "TEST-EMP-002",
+                "2025-04",
+            )
+
+            assert result["present_days"] == 1
+            assert result["missing_checkout_days"] == 1
+            assert result["overtime_hours"] == Decimal("0.00")
+
+    finally:
+        Base.metadata.drop_all(engine)
+        engine.dispose()
