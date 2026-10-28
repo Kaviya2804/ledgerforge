@@ -1,0 +1,7 @@
+Task 6 - Attendance Data Verification
+=====================================
+Source CSV: ../03_Data/csv/attendance.csv
+CSV row count: 150155
+Database table: attendance
+Database row count: 150155
+Result: PASS - CSV and database row counts match.
