@@ -23,3 +23,21 @@ Try the `GET /departments` endpoint.
 
 ```bash
 python -m pytest
+Attendance Management Policy
+
+Missing Check-out Policy
+
+- If an employee has a check-in time but no check-out time, the attendance record will be flagged for review.
+- Working hours and overtime will not be calculated for records with a missing check-out time.
+- The record will remain pending until the missing check-out time is verified by the manager.
+- Weekends and company holidays are excluded from monthly attendance summaries.
+- Attendance records marked as "PRESENT" and "WFH" are counted separately.
+- Late attendance is counted only on eligible working days.
+### Missing Checkout Rule
+
+If an employee has a check-in time but no check-out time,
+the attendance record will be treated as incomplete.
+
+Overtime hours will not be calculated for incomplete records.
+The missing checkout must be verified and corrected before
+the attendance summary is finalized.

@@ -11,6 +11,11 @@ from app.models import (
     SalaryComponent,
     SalaryRevision,
     SalaryStructure,
+    Attendance,
+    LeaveType,
+    LeaveRequest,
+    LeaveBalance,
+    Holiday,
 )
 
 
@@ -19,16 +24,13 @@ def get_csv_path(filename: str) -> Path:
     return Path(settings.data_dir) / filename
 
 
-def read_csv(filename: str) -> pd.DataFrame:
-    """Read a CSV file and prepare values for database insertion."""
-    file_path = get_csv_path(filename)
+def prepare_dataframe(
+    df: pd.DataFrame,
+    filename: str,
+) -> pd.DataFrame:
+    """Prepare CSV values for SQLAlchemy models."""
 
-    if not file_path.exists():
-        raise FileNotFoundError(f"CSV file not found: {file_path.resolve()}")
-
-    df = pd.read_csv(file_path)
-
-    # Rename employee CSV columns to match the database model.
+    # Rename employee CSV columns to match the model.
     if filename == "employees.csv":
         df = df.rename(
             columns={
@@ -46,12 +48,22 @@ def read_csv(filename: str) -> pd.DataFrame:
     boolean_columns = {
         "roles.csv": ["overtime_eligible"],
         "employees.csv": ["pf_applicable", "esi_applicable"],
+        "leave_types.csv": [
+            "prorated_for_joiners",
+            "carry_forward_allowed",
+        ],
+        "holidays.csv": ["falls_on_weekend"],
     }
 
     for column in boolean_columns.get(filename, []):
         if column in df.columns:
             df[column] = df[column].map(
-                {"Y": True, "N": False}
+                {
+                    "Y": True,
+                    "N": False,
+                    "y": True,
+                    "n": False,
+                }
             )
 
     # Convert date columns.
@@ -75,39 +87,119 @@ def read_csv(filename: str) -> pd.DataFrame:
             "effective_from",
             "effective_to",
         ],
+        "attendance.csv": ["attendance_date"],
+        "leave_requests.csv": [
+            "start_date",
+            "end_date",
+            "applied_on",
+            "decided_on",
+        ],
+        "leave_balances.csv": ["as_of_date"],
+        "holidays.csv": ["holiday_date"],
     }
 
     for column in date_columns.get(filename, []):
         if column in df.columns:
             df[column] = pd.to_datetime(
-                df[column], errors="raise"
+                df[column],
+                errors="raise",
             )
 
             if column != "created_at":
                 df[column] = df[column].dt.date
 
-    # Replace missing values with None.
+    # Convert missing values to Python None.
     df = df.astype(object).where(pd.notna(df), None)
 
     return df
 
 
-def load_csv_to_table(session, filename, model, table_name):
-    """Load CSV records using merge so existing primary keys are updated."""
+def read_csv(filename: str) -> pd.DataFrame:
+    """Read and prepare a complete CSV file."""
+
+    file_path = get_csv_path(filename)
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"CSV file not found: {file_path.resolve()}"
+        )
+
+    df = pd.read_csv(file_path)
+
+    return prepare_dataframe(df, filename)
+
+
+def load_csv_to_table(
+    session,
+    filename: str,
+    model,
+    table_name: str,
+) -> None:
+    """Load CSV data into the corresponding database table."""
+
+    file_path = get_csv_path(filename)
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"CSV file not found: {file_path.resolve()}"
+        )
+
+    # Attendance contains many rows, so process it in chunks.
+    if filename == "attendance.csv":
+        from sqlalchemy import insert
+
+        chunk_size = 10000
+        total_loaded = 0
+
+        for chunk in pd.read_csv(
+            file_path,
+            chunksize=chunk_size,
+        ):
+            chunk = prepare_dataframe(chunk, filename)
+            records = chunk.to_dict(orient="records")
+
+            if records:
+                session.execute(
+                    insert(model),
+                    records,
+                )
+                session.flush()
+
+            total_loaded += len(records)
+
+            print(
+                f"{table_name}: Processed {total_loaded} rows",
+                flush=True,
+            )
+
+        print(
+            f"{table_name}: Finished processing "
+            f"{total_loaded} rows",
+            flush=True,
+        )
+
+        return
+    # Other CSV files use merge to support existing records.
     df = read_csv(filename)
     records = df.to_dict(orient="records")
 
-    print(f"{table_name}: Reading {len(records)} rows", flush=True)
+    print(
+        f"{table_name}: Reading {len(records)} rows",
+        flush=True,
+    )
 
     for record in records:
         session.merge(model(**record))
 
     session.flush()
 
-    print(f"{table_name}: Loaded {len(records)} rows", flush=True)
+    print(
+        f"{table_name}: Loaded {len(records)} rows",
+        flush=True,
+    )
 
 
-# Load parent tables before dependent tables.
+# Parent tables must be loaded before dependent tables.
 TABLES = [
     ("departments.csv", Department, "departments"),
     ("roles.csv", Role, "roles"),
@@ -117,14 +209,32 @@ TABLES = [
         EmployeeAssignment,
         "employee_assignments",
     ),
-    ("salary_components.csv", SalaryComponent, "salary_components"),
-    ("salary_revisions.csv", SalaryRevision, "salary_revisions"),
-    ("salary_structures.csv", SalaryStructure, "salary_structures"),
+    (
+        "salary_components.csv",
+        SalaryComponent,
+        "salary_components",
+    ),
+    (
+        "salary_revisions.csv",
+        SalaryRevision,
+        "salary_revisions",
+    ),
+    (
+        "salary_structures.csv",
+        SalaryStructure,
+        "salary_structures",
+    ),
+    ("leave_types.csv", LeaveType, "leave_types"),
+    ("holidays.csv", Holiday, "holidays"),
+    ("attendance.csv", Attendance, "attendance"),
+    ("leave_requests.csv", LeaveRequest, "leave_requests"),
+    ("leave_balances.csv", LeaveBalance, "leave_balances"),
 ]
 
 
-def load_company_data():
-    """Load all configured company data in a single transaction."""
+def load_company_data() -> None:
+    """Load all company data in a single transaction."""
+
     with SessionLocal() as session:
         try:
             for filename, model, table_name in TABLES:
@@ -144,8 +254,10 @@ def load_company_data():
 
         except Exception:
             session.rollback()
+
             print(
-                "\nLoading failed. Database changes were rolled back.",
+                "\nLoading failed. Database changes "
+                "were rolled back.",
                 flush=True,
             )
             raise
