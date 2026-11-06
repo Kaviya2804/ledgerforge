@@ -3,15 +3,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from datetime import date
 
 from app.main import app
 from app.database import Base, get_db
+from app.models import Employee, User
+from app.auth_service import hash_password
 
-# Import project models so their tables are registered with Base.metadata.
-from app import models  # noqa: F401
 
-
-# Create a separate test database.
 TEST_DATABASE_URL = "sqlite://"
 
 test_engine = create_engine(
@@ -27,7 +26,6 @@ TestingSessionLocal = sessionmaker(
 )
 
 
-# Create test tables and override database dependency.
 @pytest.fixture
 def client():
     Base.metadata.create_all(bind=test_engine)
@@ -41,7 +39,45 @@ def client():
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # Create an ADMIN employee and user in the test database.
+    with TestingSessionLocal() as db:
+        admin_employee = Employee(
+            emp_id="ADMIN001",
+            full_name="Test Admin",
+            work_email="admin.test@example.com",
+            hire_date=date(2020, 1, 1),
+            employment_status="Active",
+            employment_type="Permanent",
+        )
+        db.add(admin_employee)
+        db.flush()
+
+        admin_user = User(
+            user_id="TEST-ADMIN",
+            employee_id="ADMIN001",
+            username="test.admin@example.com",
+            password_hash=hash_password("TestAdmin@123"),
+            role="ADMIN",
+            is_active=True,
+        )
+        db.add(admin_user)
+        db.commit()
+
     with TestClient(app) as test_client:
+        login_response = test_client.post(
+            "/auth/login",
+            json={
+                "username": "test.admin@example.com",
+                "password": "TestAdmin@123",
+            },
+        )
+        assert login_response.status_code == 200
+
+        token = login_response.json()["access_token"]
+        test_client.headers.update({
+            "Authorization": f"Bearer {token}"
+        })
+
         yield test_client
 
     app.dependency_overrides.clear()
@@ -109,7 +145,6 @@ def test_update_employee(client):
     assert create_response.status_code == 201
 
     update_data = {"work_location": "Chennai"}
-
     response = client.patch("/employees/EMP102", json=update_data)
 
     assert response.status_code == 200
@@ -126,16 +161,12 @@ def test_delete_employee(client):
         "employment_type": "Permanent",
     }
 
-    create_response = client.post(
-        "/employees/",
-        json=employee_data,
-    )
+    create_response = client.post("/employees/", json=employee_data)
     assert create_response.status_code == 201
 
     response = client.delete("/employees/EMP103")
     assert response.status_code == 204
 
-    # Verify that the deleted employee record is present
     get_response = client.get("/employees/EMP103")
     assert get_response.status_code == 200
 
@@ -154,7 +185,6 @@ def test_team_endpoint(client):
     assert create_response.status_code == 201
 
     response = client.get("/employees/EMP104/team")
-
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -169,10 +199,7 @@ def test_get_existing_employee(client):
         "employment_type": "Permanent",
     }
 
-    create_response = client.post(
-        "/employees/",
-        json=employee_data,
-    )
+    create_response = client.post("/employees/", json=employee_data)
     assert create_response.status_code == 201
 
     response = client.get("/employees/EMP105")
@@ -192,10 +219,7 @@ def test_employee_response_excludes_dob(client):
         "employment_type": "Permanent",
     }
 
-    create_response = client.post(
-        "/employees/",
-        json=employee_data,
-    )
+    create_response = client.post("/employees/", json=employee_data)
     assert create_response.status_code == 201
 
     response = client.get("/employees/EMP106")
@@ -225,14 +249,9 @@ def test_team_excludes_former_employees_by_default(client):
         "manager_id": "MGR107",
     }
 
-    manager_response = client.post("/employees/", json=manager_data)
-    assert manager_response.status_code == 201
-
-    employee_response = client.post("/employees/", json=employee_data)
-    assert employee_response.status_code == 201
-
-    delete_response = client.delete("/employees/EMP107")
-    assert delete_response.status_code == 204
+    assert client.post("/employees/", json=manager_data).status_code == 201
+    assert client.post("/employees/", json=employee_data).status_code == 201
+    assert client.delete("/employees/EMP107").status_code == 204
 
     response = client.get("/employees/MGR107/team")
 
@@ -263,14 +282,9 @@ def test_team_includes_former_employees_when_requested(client):
         "manager_id": "MGR108",
     }
 
-    manager_response = client.post("/employees/", json=manager_data)
-    assert manager_response.status_code == 201
-
-    create_response = client.post("/employees/", json=employee_data)
-    assert create_response.status_code == 201
-
-    delete_response = client.delete("/employees/EMP108")
-    assert delete_response.status_code == 204
+    assert client.post("/employees/", json=manager_data).status_code == 201
+    assert client.post("/employees/", json=employee_data).status_code == 201
+    assert client.delete("/employees/EMP108").status_code == 204
 
     response = client.get(
         "/employees/MGR108/team?include_former=true"

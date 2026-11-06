@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
+from sqlalchemy import insert
+
 from app.config import settings
 from app.database import SessionLocal
 from app.models import (
@@ -16,6 +18,14 @@ from app.models import (
     LeaveRequest,
     LeaveBalance,
     Holiday,
+    Client,
+    Invoice,
+    InvoiceItem,
+    InvoicePayment,
+    Vendor,
+    Expense,
+    PayrollRun,
+    PayrollItem,
 )
 
 
@@ -30,7 +40,6 @@ def prepare_dataframe(
 ) -> pd.DataFrame:
     """Prepare CSV values for SQLAlchemy models."""
 
-    # Rename employee CSV columns to match the model.
     if filename == "employees.csv":
         df = df.rename(
             columns={
@@ -44,7 +53,6 @@ def prepare_dataframe(
             }
         )
 
-    # Convert Y/N values to Boolean.
     boolean_columns = {
         "roles.csv": ["overtime_eligible"],
         "employees.csv": ["pf_applicable", "esi_applicable"],
@@ -53,20 +61,35 @@ def prepare_dataframe(
             "carry_forward_allowed",
         ],
         "holidays.csv": ["falls_on_weekend"],
+        "clients.csv": ["is_active"],
+        "invoices.csv": ["carried_in_from_prior_period"],
+        "vendors.csv": ["is_active"],
+    }
+
+    boolean_map = {
+        "Y": True,
+        "N": False,
+        "YES": True,
+        "NO": False,
+        "TRUE": True,
+        "FALSE": False,
+        "1": True,
+        "0": False,
     }
 
     for column in boolean_columns.get(filename, []):
         if column in df.columns:
-            df[column] = df[column].map(
-                {
-                    "Y": True,
-                    "N": False,
-                    "y": True,
-                    "n": False,
-                }
+            df[column] = df[column].apply(
+                lambda value: (
+                    None
+                    if pd.isna(value)
+                    else boolean_map.get(
+                        str(value).strip().upper(),
+                        value,
+                    )
+                )
             )
 
-    # Convert date columns.
     date_columns = {
         "employees.csv": [
             "dob",
@@ -96,6 +119,26 @@ def prepare_dataframe(
         ],
         "leave_balances.csv": ["as_of_date"],
         "holidays.csv": ["holiday_date"],
+        "clients.csv": ["onboarded_on"],
+        "invoices.csv": [
+            "invoice_date",
+            "due_date",
+            "last_payment_date",
+            "created_at",
+        ],
+        "invoice_payments.csv": ["payment_date"],
+        "expenses.csv": [
+            "expense_date",
+            "due_date",
+            "paid_date",
+        ],
+        "payroll_runs.csv": [
+            "period_start",
+            "period_end",
+            "pay_date",
+            "created_at",
+            "approved_at",
+        ],
     }
 
     for column in date_columns.get(filename, []):
@@ -108,7 +151,6 @@ def prepare_dataframe(
             if column != "created_at":
                 df[column] = df[column].dt.date
 
-    # Convert missing values to Python None.
     df = df.astype(object).where(pd.notna(df), None)
 
     return df
@@ -144,12 +186,15 @@ def load_csv_to_table(
             f"CSV file not found: {file_path.resolve()}"
         )
 
-    # Attendance contains many rows, so process it in chunks.
+    # Attendance is loaded in chunks.
     if filename == "attendance.csv":
-        from sqlalchemy import insert
-
         chunk_size = 10000
         total_loaded = 0
+
+        session.query(model).delete(
+            synchronize_session=False
+        )
+        session.flush()
 
         for chunk in pd.read_csv(
             file_path,
@@ -179,8 +224,32 @@ def load_csv_to_table(
         )
 
         return
-    # Other CSV files use merge to support existing records.
+
+    # Read other CSV files.
     df = read_csv(filename)
+
+    # PayrollItem model uses only these nine columns.
+    if filename == "payroll_items.csv":
+        df = df[
+            [
+                "payroll_item_id",
+                "run_id",
+                "employee_id",
+                "department_id",
+                "earned_fixed_pay",
+                "overtime_pay",
+                "variable_pay",
+                "pf_employer",
+                "esi_employer",
+                "pf_employee",
+                "esi_employee",
+                "professional_tax",
+                "tds",
+                "other_deductions",
+                "net_pay",
+            ]
+        ]
+
     records = df.to_dict(orient="records")
 
     print(
@@ -229,6 +298,14 @@ TABLES = [
     ("attendance.csv", Attendance, "attendance"),
     ("leave_requests.csv", LeaveRequest, "leave_requests"),
     ("leave_balances.csv", LeaveBalance, "leave_balances"),
+    ("clients.csv", Client, "clients"),
+    ("invoices.csv", Invoice, "invoices"),
+    ("invoice_items.csv", InvoiceItem, "invoice_items"),
+    ("invoice_payments.csv", InvoicePayment, "invoice_payments"),
+    ("vendors.csv", Vendor, "vendors"),
+    ("expenses.csv", Expense, "expenses"),
+    ("payroll_runs.csv", PayrollRun, "payroll_runs"),
+    ("payroll_items.csv", PayrollItem, "payroll_items"),
 ]
 
 
