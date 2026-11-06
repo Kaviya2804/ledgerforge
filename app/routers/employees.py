@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Employee
 from ..schemas import EmployeeCreate, EmployeeUpdate, EmployeeResponse
+from ..security import get_current_user, require_roles
 
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
-# 1. GET: List employees with search, department filter, and pagination
+# 1. GET: List employees (ADMIN and HR only)
 @router.get("/", response_model=list[EmployeeResponse])
 def list_employees(
     search: str | None = None,
@@ -20,6 +21,7 @@ def list_employees(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "HR")),
 ):
     query = db.query(Employee)
 
@@ -44,12 +46,25 @@ def list_employees(
     )
 
 
-# 2. GET: Get one employee
+# 2. GET: Get one employee (employees can view only themselves)
 @router.get("/{emp_id}", response_model=EmployeeResponse)
 def get_employee(
     emp_id: str,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    if current_user.role == "EMPLOYEE" and current_user.employee_id != emp_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Employees can access only their own profile",
+        )
+
+    if current_user.role not in ("ADMIN", "HR", "EMPLOYEE"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied",
+        )
+
     employee = db.get(Employee, emp_id)
 
     if employee is None:
@@ -61,7 +76,7 @@ def get_employee(
     return employee
 
 
-# 3. POST: Create a new employee
+# 3. POST: Create employee (ADMIN and HR only)
 @router.post(
     "/",
     response_model=EmployeeResponse,
@@ -70,6 +85,7 @@ def get_employee(
 def create_employee(
     employee_data: EmployeeCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "HR")),
 ):
     existing_employee = db.get(Employee, employee_data.emp_id)
 
@@ -101,12 +117,13 @@ def create_employee(
     return employee
 
 
-# 4. PATCH: Update employee details
+# 4. PATCH: Update employee (ADMIN and HR only)
 @router.patch("/{emp_id}", response_model=EmployeeResponse)
 def update_employee(
     emp_id: str,
     employee_data: EmployeeUpdate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "HR")),
 ):
     employee = db.get(Employee, emp_id)
 
@@ -140,11 +157,12 @@ def update_employee(
     return employee
 
 
-# 5. DELETE: Soft-delete an employee
+# 5. DELETE: Deactivate employee (ADMIN and HR only)
 @router.delete("/{emp_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(
     emp_id: str,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "HR")),
 ):
     employee = db.get(Employee, emp_id)
 
@@ -171,12 +189,13 @@ def delete_employee(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# 6. GET: Get an employee's direct reports
+# 6. GET: Get an employee's team (ADMIN and HR only)
 @router.get("/{emp_id}/team", response_model=list[EmployeeResponse])
 def get_employee_team(
     emp_id: str,
     include_former: bool = Query(default=False),
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "HR")),
 ):
     manager = db.get(Employee, emp_id)
 
@@ -188,7 +207,6 @@ def get_employee_team(
 
     query = db.query(Employee).filter(Employee.manager_id == emp_id)
 
-    # By default, exclude former employees
     if not include_former:
         query = query.filter(Employee.exit_date.is_(None))
 

@@ -4,3 +4,16 @@ __pycache__/
 .venv/
 *.db
 .pytest_cache/
+# Generated payroll and export files
+payroll_*.csv
+payroll_*.txt
+payroll_*.md
+payslips/
+task9_export/
+task9_final_export/
+task12_final_export/
+
+# Local test databases
+*.db
+*.sqlite
+*.sqlite3

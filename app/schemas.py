@@ -105,3 +105,16 @@ class SalaryRevisionResponse(BaseModel):
     pct_change: Decimal | None = None
     role_id_after: str
     approved_by: str | None = None
+# ==============================
+# AUTHENTICATION SCHEMAS
+# ==============================
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = 1800

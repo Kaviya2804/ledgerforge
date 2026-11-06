@@ -41,3 +41,18 @@ the attendance record will be treated as incomplete.
 Overtime hours will not be calculated for incomplete records.
 The missing checkout must be verified and corrected before
 the attendance summary is finalized.
+## Task 13 – Authentication and Role-Based Access Control
+
+Implemented:
+- User authentication using JWT.
+- Password hashing using bcrypt.
+- 30-minute access token expiration.
+- Role-based access control (ADMIN, HR, EMPLOYEE).
+- Employee access restricted to their own profile, salary and payslips.
+- Inactive user token validation.
+- Protected API endpoints.
+
+### Security Testing
+All authentication, authorization, employee privacy and account deactivation tests passed.
+
+Detailed test report: [Task 13 Security Test Report](docs/task13_security_test_report.md)
