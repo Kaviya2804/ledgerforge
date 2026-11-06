@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from .database import Base, engine
-from .routers import departments, employees, salary, payslips, auth
+from .routers import departments, employees, salary, payslips, auth, tax_rules,statutory_reports
 
 Base.metadata.create_all(engine)
 
@@ -28,3 +28,5 @@ app.include_router(departments.router)
 app.include_router(employees.router)
 app.include_router(salary.router)
 app.include_router(payslips.router)
+app.include_router(tax_rules.router)
+app.include_router(statutory_reports.router)

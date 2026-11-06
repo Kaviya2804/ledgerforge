@@ -511,3 +511,33 @@ class User(Base):
         DateTime,
         nullable=True,
     )
+class TaxSlab(Base):
+    __tablename__ = "tax_slabs"
+
+    slab_id = Column(String(20), primary_key=True)
+    regime = Column(String(10), nullable=False)
+    financial_year = Column(String(20), nullable=False)
+    income_from = Column(Numeric(14, 2), nullable=False)
+    income_to = Column(Numeric(14, 2), nullable=True)
+    rate_percent = Column(Numeric(6, 2), nullable=False)
+    effective_from = Column(Date, nullable=False)
+    note = Column(String(300), nullable=True)
+
+
+class TaxParameter(Base):
+    __tablename__ = "tax_parameters"
+
+    parameter = Column(String(100), primary_key=True)
+    value = Column(Numeric(14, 2), nullable=False)
+    note = Column(String(300), nullable=True)
+
+
+class StatutoryRate(Base):
+    __tablename__ = "statutory_rates"
+
+    parameter = Column(String(100), primary_key=True)
+    value = Column(Numeric(14, 2), nullable=False)
+    unit = Column(String(50), nullable=True)
+    note = Column(String(300), nullable=True)
+    effective_from = Column(Date, nullable=False)
+

@@ -118,3 +118,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int = 1800
+class TaxSlabUpdate(BaseModel):
+    rate_percent: Decimal = Field(ge=0, le=100)
+    effective_from: date
+    note: str | None = Field(default=None, max_length=300)
