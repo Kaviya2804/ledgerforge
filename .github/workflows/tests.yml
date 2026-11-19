@@ -8,6 +8,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      SECRET_KEY: "ci-only-secret-key-for-testing"
+      DEMO_ADMIN_PASSWORD: "CiOnlyAdminPass123!"
+      DEMO_HR_PASSWORD: "CiOnlyHRPass123!"
+      DEMO_EMPLOYEE_PASSWORD: "CiOnlyEmployeePass123!"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,4 +30,4 @@ jobs:
           pip install pytest pytest-cov
 
       - name: Run tests
-        run: pytest --cov=app --cov-report=term-missing -q
+        run: pytest tests/ --cov=app --cov-report=term-missing -q
