@@ -13,7 +13,7 @@ from .routers import (
     payroll_jobs,
 )
 
-Base.metadata.create_all(engine)
+
 
 app = FastAPI(
     title="LedgerForge API",
