@@ -1,3 +1,5 @@
+import pytest
+from pathlib import Path
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -8,6 +10,10 @@ from scripts.seed_example import main as seed
 
 
 client = TestClient(app)
+
+DATASET_AVAILABLE = (
+    Path(settings.data_dir) / "departments.csv"
+).is_file()
 
 
 def get_admin_headers():
@@ -27,6 +33,10 @@ def get_admin_headers():
     return {"Authorization": f"Bearer {token}"}
 
 
+@pytest.mark.skipif(
+    not DATASET_AVAILABLE,
+    reason="Company CSV dataset is not available in CI",
+)
 def test_trial_balance_report():
     headers = get_admin_headers()
 
@@ -47,6 +57,10 @@ def test_trial_balance_report():
     assert Decimal(data["total_credit"]) == Decimal("5298104813.57")
 
 
+@pytest.mark.skipif(
+    not DATASET_AVAILABLE,
+    reason="Company CSV dataset is not available in CI",
+)
 def test_profit_loss_report():
     headers = get_admin_headers()
 
@@ -68,6 +82,10 @@ def test_profit_loss_report():
     assert Decimal(data["net_profit"]) == Decimal("224683587.58")
 
 
+@pytest.mark.skipif(
+    not DATASET_AVAILABLE,
+    reason="Company CSV dataset is not available in CI",
+)
 def test_balance_sheet_report():
     headers = get_admin_headers()
 
@@ -86,4 +104,3 @@ def test_balance_sheet_report():
     assert Decimal(data["liabilities"]) == Decimal("77499607.07")
     assert Decimal(data["equity"]) == Decimal("161579764.00")
     assert Decimal(data["current_profit"]) == Decimal("224683587.58")
-    

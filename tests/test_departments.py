@@ -1,9 +1,17 @@
+import pytest
+from pathlib import Path
 from fastapi.testclient import TestClient
+
 from app.main import app
-from scripts.seed_example import main as seed
 from app.config import settings
+from scripts.seed_example import main as seed
+
 
 client = TestClient(app)
+
+DATASET_AVAILABLE = (
+    Path(settings.data_dir) / "departments.csv"
+).is_file()
 
 
 def get_admin_token():
@@ -19,11 +27,18 @@ def get_admin_token():
 
 
 def test_health():
-    assert client.get("/api/v1/health").json()["status"] == "ok"
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
 
 
+@pytest.mark.skipif(
+    not DATASET_AVAILABLE,
+    reason="Company CSV dataset is not available in CI",
+)
 def test_departments_after_seed():
     seed()
+
     token = get_admin_token()
     headers = {"Authorization": f"Bearer {token}"}
 
