@@ -52,3 +52,4 @@ websockets==17.3
 
 celery[redis]==5.7.0
 pytest-cov==7.1.0
+psycopg[binary]==3.2.10
