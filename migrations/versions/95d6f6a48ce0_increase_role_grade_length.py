@@ -10,20 +10,20 @@ depends_on = None
 
 
 def upgrade():
-    op.alter_column(
-        "roles",
-        "grade",
-        existing_type=sa.String(length=20),
-        type_=sa.String(length=100),
-        existing_nullable=False,
-    )
+    with op.batch_alter_table("roles") as batch_op:
+        batch_op.alter_column(
+            "grade",
+            existing_type=sa.String(length=20),
+            type_=sa.String(length=100),
+            existing_nullable=False,
+        )
 
 
 def downgrade():
-    op.alter_column(
-        "roles",
-        "grade",
-        existing_type=sa.String(length=100),
-        type_=sa.String(length=20),
-        existing_nullable=False,
-    )
+    with op.batch_alter_table("roles") as batch_op:
+        batch_op.alter_column(
+            "grade",
+            existing_type=sa.String(length=100),
+            type_=sa.String(length=20),
+            existing_nullable=False,
+        )
