@@ -14,7 +14,7 @@ def get_admin_headers():
     seed()
 
     response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "username": "sanjay.kumar@znova-demo.example",
             "password": settings.demo_admin_password,
@@ -31,7 +31,7 @@ def test_trial_balance_report():
     headers = get_admin_headers()
 
     response = client.get(
-        "/reports/financial/trial-balance",
+        "/api/v1/reports/financial/trial-balance",
         params={
             "start_date": "2025-04-01",
             "end_date": "2026-11-03",
@@ -51,7 +51,7 @@ def test_profit_loss_report():
     headers = get_admin_headers()
 
     response = client.get(
-        "/reports/financial/profit-loss",
+        "/api/v1/reports/financial/profit-loss",
         params={
             "start_date": "2025-04-01",
             "end_date": "2026-11-03",
@@ -72,7 +72,7 @@ def test_balance_sheet_report():
     headers = get_admin_headers()
 
     response = client.get(
-        "/reports/financial/balance-sheet",
+        "/api/v1/reports/financial/balance-sheet",
         params={"as_of_date": "2026-11-03"},
         headers=headers,
     )

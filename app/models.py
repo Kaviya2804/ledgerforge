@@ -38,7 +38,7 @@ class Role(Base):
     )
     role_title: Mapped[str] = mapped_column(String(100))
     level: Mapped[int] = mapped_column(Integer)
-    grade: Mapped[str] = mapped_column(String(20))
+    grade: Mapped[str] = mapped_column(String(100))
     band_min_annual: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     band_mid_annual: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     band_max_annual: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

@@ -1,21 +1,43 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 
 from .database import Base, engine
-from .routers import departments, employees, salary, payslips, auth, tax_rules,statutory_reports
+from .routers import (
+    departments,
+    employees,
+    salary,
+    payslips,
+    auth,
+    tax_rules,
+    statutory_reports,
+    financial_reports,
+    payroll_jobs,
+)
 
 Base.metadata.create_all(engine)
 
 app = FastAPI(
     title="LedgerForge API",
-    version="0.1.0",
+    version="1.0.0-rc1",
     description=(
         "Payroll, accounting and employee data engine "
         "for Zenith Nova Technologies"
     ),
 )
 
+api_v1 = APIRouter(prefix="/api/v1")
 
-@app.get("/health", tags=["system"])
+api_v1.include_router(auth.router)
+api_v1.include_router(departments.router)
+api_v1.include_router(employees.router)
+api_v1.include_router(salary.router)
+api_v1.include_router(payslips.router)
+api_v1.include_router(tax_rules.router)
+api_v1.include_router(statutory_reports.router)
+api_v1.include_router(financial_reports.router)
+api_v1.include_router(payroll_jobs.router)
+
+
+@api_v1.get("/health", tags=["system"])
 def health():
     return {
         "status": "ok",
@@ -23,10 +45,4 @@ def health():
     }
 
 
-app.include_router(auth.router)
-app.include_router(departments.router)
-app.include_router(employees.router)
-app.include_router(salary.router)
-app.include_router(payslips.router)
-app.include_router(tax_rules.router)
-app.include_router(statutory_reports.router)
+app.include_router(api_v1)

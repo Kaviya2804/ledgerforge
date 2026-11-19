@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.venv
+.git
+.pytest_cache
+__pycache__
+*.pyc
+*.db
+.coverage
+htmlcov
+04_Validation_Vault-*
+task*_export
+task*_final_export

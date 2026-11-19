@@ -8,7 +8,7 @@ client = TestClient(app)
 
 def get_admin_token():
     response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "username": "sanjay.kumar@znova-demo.example",
             "password": settings.demo_admin_password,
@@ -19,7 +19,7 @@ def get_admin_token():
 
 
 def test_health():
-    assert client.get("/health").json()["status"] == "ok"
+    assert client.get("/api/v1/health").json()["status"] == "ok"
 
 
 def test_departments_after_seed():
@@ -27,9 +27,9 @@ def test_departments_after_seed():
     token = get_admin_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.get("/departments", headers=headers)
+    response = client.get("/api/v1/departments", headers=headers)
     assert response.status_code == 200
     assert len(response.json()) == 11
 
-    response = client.get("/departments/D99", headers=headers)
+    response = client.get("/api/v1/departments/D99", headers=headers)
     assert response.status_code == 404

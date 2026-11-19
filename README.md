@@ -56,3 +56,43 @@ Implemented:
 All authentication, authorization, employee privacy and account deactivation tests passed.
 
 Detailed test report: [Task 13 Security Test Report](docs/task13_security_test_report.md)
+---
+
+Docker Deployment (Task 16)
+
+Prerequisites
+
+- Git
+- Docker Desktop
+- Docker Compose
+
+Clone the project
+
+git clone https://github.com/Kaviya2804/ledgerforge.git
+cd ledgerforge
+
+Configure environment
+
+Copy ".env.example" to ".env" and configure the required settings. Never commit ".env" or share secrets.
+
+Start application
+
+docker compose up --build -d
+
+Run database migrations
+
+docker compose exec api alembic upgrade head
+
+Verify services
+
+docker compose ps
+
+API documentation
+
+http://localhost:8000/docs
+
+Run tests
+
+pytest --cov=app --cov-report=term-missing -q
+
+LedgerForge uses FastAPI, PostgreSQL, Redis and Celery for background payroll processing.
