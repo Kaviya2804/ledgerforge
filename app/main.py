@@ -1,7 +1,7 @@
 import logging
 import json
 
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from sqlalchemy import text
 
 from .database import Base, engine
@@ -17,6 +17,7 @@ from .routers import (
     payroll_jobs,
 )
 
+
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         return json.dumps({
@@ -25,11 +26,13 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
         })
 
+
 logging.basicConfig(
     level=logging.INFO,
     format='{"level":"%(levelname)s","message":"%(message)s"}',
     force=True,
 )
+
 
 app = FastAPI(
     title="LedgerForge API",
@@ -41,6 +44,7 @@ app = FastAPI(
 )
 
 api_v1 = APIRouter(prefix="/api/v1")
+
 
 # Register all routers
 api_v1.include_router(auth.router)
@@ -54,7 +58,7 @@ api_v1.include_router(financial_reports.router)
 api_v1.include_router(payroll_jobs.router)
 
 
-# Health check with database connection verification
+# Improved health check with database verification
 @api_v1.get("/health", tags=["system"])
 def health():
     try:
@@ -68,11 +72,14 @@ def health():
         }
 
     except Exception:
-        return {
-            "status": "error",
-            "service": "ledgerforge",
-            "database": "disconnected",
-        }
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "error",
+                "service": "ledgerforge",
+                "database": "disconnected",
+            },
+        )
 
 
 # Register API routes
