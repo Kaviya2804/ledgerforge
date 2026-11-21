@@ -1,6 +1,9 @@
+import csv
+import io
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -46,7 +49,7 @@ def list_employees(
     )
 
 
-# 2. GET: Get one employee (employees can view only themselves)
+# 2. GET: Get one employee
 @router.get("/{emp_id}", response_model=EmployeeResponse)
 def get_employee(
     emp_id: str,
@@ -76,7 +79,7 @@ def get_employee(
     return employee
 
 
-# 3. POST: Create employee (ADMIN and HR only)
+# 3. POST: Create employee
 @router.post(
     "/",
     response_model=EmployeeResponse,
@@ -117,7 +120,7 @@ def create_employee(
     return employee
 
 
-# 4. PATCH: Update employee (ADMIN and HR only)
+# 4. PATCH: Update employee
 @router.patch("/{emp_id}", response_model=EmployeeResponse)
 def update_employee(
     emp_id: str,
@@ -157,7 +160,7 @@ def update_employee(
     return employee
 
 
-# 5. DELETE: Deactivate employee (ADMIN and HR only)
+# 5. DELETE: Deactivate employee
 @router.delete("/{emp_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(
     emp_id: str,
@@ -189,7 +192,7 @@ def delete_employee(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# 6. GET: Get an employee's team (ADMIN and HR only)
+# 6. GET: Get an employee's team
 @router.get("/{emp_id}/team", response_model=list[EmployeeResponse])
 def get_employee_team(
     emp_id: str,
@@ -211,3 +214,49 @@ def get_employee_team(
         query = query.filter(Employee.exit_date.is_(None))
 
     return query.order_by(Employee.emp_id).all()
+
+
+# 7. GET: Export employees to CSV (ADMIN and HR only)
+# Supports full export and incremental export using ?since=YYYY-MM-DD
+@router.get("/export/csv")
+def export_employees_csv(
+    since: date | None = Query(default=None, description="Export employees created on or after this date"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN", "HR")),
+):
+    query = db.query(Employee)
+
+    if since is not None:
+        query = query.filter(Employee.created_at >= since)
+
+    employees = query.order_by(Employee.emp_id).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Employee ID",
+        "Full Name",
+        "Email",
+        "Department",
+        "Created At",
+    ])
+
+    for employee in employees:
+        writer.writerow([
+            employee.emp_id,
+            employee.full_name,
+            employee.work_email,
+            employee.department_id,
+            employee.created_at,
+        ])
+
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=employees.csv"
+        },
+    )
